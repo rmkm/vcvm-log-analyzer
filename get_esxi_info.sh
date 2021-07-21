@@ -90,7 +90,6 @@ function perg_after () {
 #end=$(tac $VIMDUMP | grep_after 3 "dynamic" )
 #$echo "end is $end"
 #exit
-echo $HOSTD
 
 
 if test -f $OUTPUT; then

@@ -87,8 +87,8 @@ error_list=(
 )
 for i in "${error_list[@]}"
 do  
-    echo "==> '$i'" >> $OUTPUT
-    zgrep "$i" var/log/vmware/vpxd/vpxd* >> $OUTPUT
+    echo "==> '$i' in $VPXD_LOG" >> $OUTPUT
+    zgrep "$i" $VPXD_LOG >> $OUTPUT
     printf "\n" >> $OUTPUT
 done
 
