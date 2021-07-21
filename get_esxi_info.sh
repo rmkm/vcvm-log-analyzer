@@ -13,6 +13,7 @@ ESXCFG_SCSI=commands/esxcfg-scsidevs_-m.txt
 VMX=vmfs/volumes/*/*/*.vmx
 VMWARE_LOG=vmfs/volumes/*/*/vmware*
 HOSTD=var/run/log/hostd.*
+VPXA=var/run/log/vpxa.*
 NET_DVS=commands/net-dvs_-l.txt
 STORAGE_CORE_DEVICE=commands/localcli_storage-core-device-list.txt
 PARTED_UTIL=commands/partedUtil.sh.txt
@@ -128,7 +129,17 @@ printf "\n\n" >> $OUTPUT
 echo "- List of the Section line of hostd logs. From: $HOSTD" >> $OUTPUT
 for i in $HOSTD
 do
-    zgrep -Hn -m 1 "Section" $i | sed 's/^/  /' >> $OUTPUT
+    #zgrep -Hn -m 1 "Section" $i | sed 's/^/  /' >> $OUTPUT
+    zgrep -Hn "Section" $i | sed 's/^/  /' >> $OUTPUT
+done
+printf "\n\n" >> $OUTPUT
+
+
+echo "- List of the Section line of vpxa logs. From: $VPXA" >> $OUTPUT
+for i in $VPXA
+do
+    #zgrep -Hn -m 1 "Section" $i | sed 's/^/  /' >> $OUTPUT
+    zgrep -Hn "Section" $i | sed 's/^/  /' >> $OUTPUT
 done
 printf "\n\n" >> $OUTPUT
 
