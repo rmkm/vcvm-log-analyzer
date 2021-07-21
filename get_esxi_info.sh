@@ -20,6 +20,7 @@ PARTED_UTIL=commands/partedUtil.sh.txt
 NET_STAT=commands/net-stats_-l.txt
 ESXCFG_MPATH=commands/esxcfg-mpath_-b.txt
 VM_INV=etc/vmware/hostd/vmInventory.xml
+SMBIOS_DUMP=commands/smbiosDump.txt
 LIST_VMX=()
 LIST_VM=()
 
@@ -35,7 +36,7 @@ function extract_lines () {
 
 # $1 grep pattern
 function get_line_number () {
-    grep -n -m 1 "$1" | cut -d : -f 1
+    grep -n -m 1 -E "$1" | cut -d : -f 1
 }
 
 # grep after the specific line
@@ -91,7 +92,6 @@ function perg_after () {
 #end=$(tac $VIMDUMP | grep_after 3 "dynamic" )
 #$echo "end is $end"
 #exit
-
 
 if test -f $OUTPUT; then
     echo "File $FILENAME already exists"
@@ -264,6 +264,70 @@ printf "\n\n" >> $OUTPUT
 
 echo "- List of connected storage devices. From: $PARTED_UTIL" >> $OUTPUT
 grep -E "Device:" $PARTED_UTIL | sed -e "s/\(Device:.*\)/  \1/"  >> $OUTPUT
+printf "\n\n" >> $OUTPUT
+
+
+echo "- Hardware specifications. From: $SMBIOS_DUMP" >> $OUTPUT
+# -------------------------------- get cpu info
+version="Version"
+keys=($version)
+end=1
+while true; # get VM info
+do
+    begin=$(grep_after $end "Processor Info" $SMBIOS_DUMP "n")
+    if [ -z "$begin" ] # if the string was not found
+    then
+        break
+    fi
+
+    end=$(grep_after $(($begin+1)) "^  [^ ]+" $SMBIOS_DUMP "n")
+
+    for i in "${keys[@]}"
+    do
+        string=$(grep_after $begin "Processor Info" $SMBIOS_DUMP)
+        echo "  $string" >> $OUTPUT
+        string=$(cat $SMBIOS_DUMP| extract_lines $begin $end | grep -E $i)
+        echo "  $string" >> $OUTPUT
+    done
+    #printf "\n" >> $OUTPUT
+
+done
+#printf "\n\n" >> $OUTPUT
+# -------------------------------- get memory info
+manufacturer="Manufacturer"
+part_number="Part"
+size="Size"
+keys=($manufacturer $part_number $size)
+end=1
+while true; # get VM info
+do
+    begin=$(grep_after $end "Memory Device" $SMBIOS_DUMP "n")
+    if [ -z "$begin" ] # if the string was not found
+    then
+        break
+    fi
+
+    end=$(grep_after $(($begin+1)) "^  [^ ]+" $SMBIOS_DUMP "n")
+
+    string=$(grep_after $begin "Memory Device" $SMBIOS_DUMP)
+    echo "  $string" >> $OUTPUT
+    for i in "${keys[@]}"
+    do
+        string=$(cat $SMBIOS_DUMP| extract_lines $begin $end | grep -E $i)
+        if [ -z "$string" ] # if the string was not found
+        then
+            continue
+        fi
+        echo "  $string" >> $OUTPUT
+    done
+    #printf "\n" >> $OUTPUT
+
+done
+printf "\n\n" >> $OUTPUT
+
+
+echo "- List of DVS. From: $NET_DVS" >> $OUTPUT
+grep -E '^switch|port [0-9]*:|\.alias|host\.portset|port\.vlan' $NET_DVS >> $OUTPUT
 printf "\n\n" >> $OUTPUT
 
 
