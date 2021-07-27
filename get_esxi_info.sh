@@ -242,12 +242,21 @@ printf "\n\n" >> $OUTPUT
 
 
 echo "- List of all vmx files and vm ID. From: $VMX and $VM_INV" >> $OUTPUT
-#du $VMX | sed -r 's/[0-9]+//' >> $OUTPUT
 for i in "${LIST_VMX[@]}"
 do
-    begin=$(perg_after 1 "$i" $VM_INV "n")
+    # not use E option (regex) for grep in order to treat vmx name as a string
+    begin=$(tac $VM_INV | extract_lines 1 | grep -n -m 1 "$i" | cut -d : -f 1)
+    if [ -z "$begin" ]
+    then
+        continue
+    fi
     objID=$(perg_after $begin "objID" $VM_INV)
+    if [ -z "$objID" ]
+    then
+        continue
+    fi
     echo "    $i  $objID" >> $OUTPUT
+    #echo "    $i" >> $OUTPUT
 done
 printf "\n\n" >> $OUTPUT
 
@@ -323,11 +332,6 @@ do
     #printf "\n" >> $OUTPUT
 
 done
-printf "\n\n" >> $OUTPUT
-
-
-echo "- List of DVS. From: $NET_DVS" >> $OUTPUT
-grep -E '^switch|port [0-9]*:|\.alias|host\.portset|port\.vlan' $NET_DVS >> $OUTPUT
 printf "\n\n" >> $OUTPUT
 
 
