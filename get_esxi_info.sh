@@ -21,6 +21,7 @@ NET_STAT=commands/net-stats_-l.txt
 ESXCFG_MPATH=commands/esxcfg-mpath_-b.txt
 VM_INV=etc/vmware/hostd/vmInventory.xml
 SMBIOS_DUMP=commands/smbiosDump.txt
+ESXCFG_VSWITCH=commands/esxcfg-vswitch_-l.txt
 LIST_VMX=()
 LIST_VM=()
 
@@ -116,6 +117,9 @@ echo "- ESXi Hosts Information" > $OUTPUT
 printf "\n\n" >> $OUTPUT
 
 
+#
+# ------------------------ General Information ------------------------
+#
 echo "- Output of 'uname -a'. From: $UNAME" >> $OUTPUT
 cat $UNAME >> $OUTPUT
 printf "\n\n" >> $OUTPUT
@@ -144,19 +148,6 @@ done
 printf "\n\n" >> $OUTPUT
 
 
-echo "- List of vmk nic of this host. From: $ESXCFG_VMKNIC" >> $OUTPUT
-cat $ESXCFG_VMKNIC | sed 's/^/  /' >> $OUTPUT
-printf "\n\n" >> $OUTPUT
-
-
-echo "- vSwitch, vmk, and vmnic info. From: $NET_STAT" >> $OUTPUT
-cat $NET_STAT | sed 's/^/  /' >> $OUTPUT
-printf "\n\n" >> $OUTPUT
-
-echo "- List of paths. From: $ESXCFG_MPATH" >> $OUTPUT
-cat $ESXCFG_MPATH | sed 's/^/  /' >> $OUTPUT
-printf "\n\n" >> $OUTPUT
-
 echo "- List of all ESXi hosts. From: $PPHOSTLIST" >> $OUTPUT
 echo " <hostId> <hostName> <ipAddress> <version> <build>" >> $OUTPUT
 tail -n +$(grep -n -m1 "<host>" $PPHOSTLIST | sed 's/:.*$//') $PPHOSTLIST \
@@ -169,6 +160,9 @@ tail -n +$(grep -n -m1 "<host>" $PPHOSTLIST | sed 's/:.*$//') $PPHOSTLIST \
 printf "\n\n" >> $OUTPUT
 
 
+#
+# ------------------------ Virtual Machines Information ------------------------
+#
 echo "- List of virtual machines. From: $VIMDUMP" >> $OUTPUT
 #ip_addr="ipAddress"
 name="name"
@@ -201,10 +195,106 @@ do
 done
 printf "\n\n" >> $OUTPUT
 
-
-echo "- List of DVS. From: $NET_DVS" >> $OUTPUT
-grep -E '^switch|port [0-9]*:|\.alias|host\.portset|port\.vlan' $NET_DVS >> $OUTPUT
+echo "- List of all vmx files and vm ID. From: $VMX and $VM_INV" >> $OUTPUT
+for i in "${LIST_VMX[@]}"
+do
+    # not use E option (regex) for grep in order to treat vmx name as a string
+    begin=$(tac $VM_INV | extract_lines 1 | grep -n -m 1 "$i" | cut -d : -f 1)
+    if [ -z "$begin" ]
+    then
+        continue
+    fi
+    objID=$(perg_after $begin "objID" $VM_INV)
+    if [ -z "$objID" ]
+    then
+        continue
+    fi
+    echo "    $i  $objID" >> $OUTPUT
+    #echo "    $i" >> $OUTPUT
+done
 printf "\n\n" >> $OUTPUT
+
+
+
+#
+# ------------------------ Network Information ------------------------
+#
+echo "- List of vmk nic of this host. From: $ESXCFG_VMKNIC" >> $OUTPUT
+cat $ESXCFG_VMKNIC | sed 's/^/  /' >> $OUTPUT
+printf "\n\n" >> $OUTPUT
+
+echo "- List of vswitch port config. From: $NET_DVS and $ESXCFG_VSWITCH" >> $OUTPUT
+#grep -E '^switch|port [0-9]*:|\.alias = [^ ]+ |host\.portset|port\.vlan|active = ' $NET_DVS >> $OUTPUT
+#grep -E '^switch|port [0-9]*:|\.alias = [^ ]+ |host\.portset|active = ' $NET_DVS >> $OUTPUT
+#port=$(grep -m 1 'port [0-9]*:' $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
+#echo "port is $port"
+
+next_switch_line=1
+while true; # get VM info
+do
+    switch_line=$(grep_after $next_switch_line "^switch" $NET_DVS "n")
+    if [ -z "$switch_line" ] # if the string was not found
+    then
+        break
+    fi
+
+    switch=$(grep_after $next_switch_line "com\.vmware\.common\.alias" $NET_DVS | sed -E 's/^	+//')
+    echo "  $switch" >> $OUTPUT
+
+    next_switch_line=$(grep_after $(($switch_line+1)) "^switch" $NET_DVS "n")
+    if [ -z "$next_switch_line" ] # if the string was not found
+    then
+        break_flag=true
+    fi
+    #echo $end
+    #grep 'common.alias' $NET_DVS
+    #port=$(grep -m 1 'port [0-9]*:' $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
+    #en=
+    #be=$begin
+    next_port_line=$switch_line
+    while true;
+    do
+        port_line=$(grep_after $next_port_line "port [0-9]*:" $NET_DVS "n")
+        if [ -z "$port_line" ] # if the string was not found
+        then
+            break
+        fi
+        #echo "portline $port_line"
+
+        port=$(grep_after $next_port_line "port [0-9]*:" $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
+
+        #grep 256 commands/esxcfg-vswitch_-l.txt | sed -E 's/^ +//' | sed -E 's/ +/,/g' | cut -d ',' -f 3
+        vmnic=$(grep "^  $port " $ESXCFG_VSWITCH | sed -E 's/^ +//' | sed -E 's/ +/,/g' | cut -d ',' -f 3)
+        echo "    port $port:" >> $OUTPUT
+        echo "      $vmnic" >> $OUTPUT
+
+        #echo "port is $port"
+
+        next_port_line=$(grep_after $(($port_line+1)) "port [0-9]*:" $NET_DVS "n")
+        if [ -z "$next_port_line" ] # if the string was not found
+        then
+            break
+        fi
+        if [[ $next_port_line -gt $next_switch_line ]]
+        then
+            break
+        fi
+    done
+
+    if [ "$break_flag" = true ]
+    then
+        #echo "break"
+        break
+    fi
+
+done
+printf "\n\n" >> $OUTPUT
+
+
+#echo "- vSwitch, vmk, and vmnic info. From: $NET_STAT" >> $OUTPUT
+#cat $NET_STAT | sed 's/^/  /' >> $OUTPUT
+#printf "\n\n" >> $OUTPUT
+
 ## test code
 #echo "- List of DVS. From: $NET_DVS" >> $OUTPUT
 #OLDIFS=$IFS
@@ -240,26 +330,12 @@ printf "\n\n" >> $OUTPUT
 #done
 #printf "\n\n" >> $OUTPUT
 
-
-echo "- List of all vmx files and vm ID. From: $VMX and $VM_INV" >> $OUTPUT
-for i in "${LIST_VMX[@]}"
-do
-    # not use E option (regex) for grep in order to treat vmx name as a string
-    begin=$(tac $VM_INV | extract_lines 1 | grep -n -m 1 "$i" | cut -d : -f 1)
-    if [ -z "$begin" ]
-    then
-        continue
-    fi
-    objID=$(perg_after $begin "objID" $VM_INV)
-    if [ -z "$objID" ]
-    then
-        continue
-    fi
-    echo "    $i  $objID" >> $OUTPUT
-    #echo "    $i" >> $OUTPUT
-done
+#
+# ------------------------ Storage Information ------------------------
+#
+echo "- List of paths. From: $ESXCFG_MPATH" >> $OUTPUT
+cat $ESXCFG_MPATH | sed 's/^/  /' >> $OUTPUT
 printf "\n\n" >> $OUTPUT
-
 
 echo "- List of disks. From: $DF" >> $OUTPUT
 cat $DF | sed 's/^/  /' >> $OUTPUT
@@ -276,8 +352,14 @@ grep -E "Device:" $PARTED_UTIL | sed -e "s/\(Device:.*\)/  \1/"  >> $OUTPUT
 printf "\n\n" >> $OUTPUT
 
 
+#
+# ------------------------ Hardware Information ------------------------
+#
 echo "- Hardware specifications. From: $SMBIOS_DUMP" >> $OUTPUT
-# -------------------------------- get cpu info
+
+#
+# get cpu info
+#
 version="Version"
 keys=($version)
 end=1
@@ -302,7 +384,10 @@ do
 
 done
 #printf "\n\n" >> $OUTPUT
-# -------------------------------- get memory info
+
+#
+# get memory info
+#
 manufacturer="Manufacturer"
 part_number="Part"
 size="Size"
@@ -338,7 +423,6 @@ printf "\n\n" >> $OUTPUT
 #echo "- List of storage devices. From: $STORAGE_CORE_DEVICE" >> $OUTPUT
 #grep -E "^[^ ].*|  Display|Other" $STORAGE_CORE_DEVICE >> $OUTPUT
 #printf "\n\n" >> $OUTPUT
-
 
 # List "State Transition"
 #OLDIFS=$IFS
