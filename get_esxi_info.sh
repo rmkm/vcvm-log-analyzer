@@ -224,53 +224,56 @@ cat $ESXCFG_VMKNIC | sed 's/^/  /' >> $OUTPUT
 printf "\n\n" >> $OUTPUT
 
 echo "- List of vswitch port config. From: $NET_DVS and $ESXCFG_VSWITCH" >> $OUTPUT
-switch_line=$(grep_after 1 "^switch" $NET_DVS "n")
-while true; # get VM info
-do
-    next_switch_line=$(grep_after $(($switch_line+1)) "^switch" $NET_DVS "n")
-    if [ -z "$next_switch_line" ] # if the string was not found
-    then
-        break_flag=true
-    fi
+if [ -f $NET_DVS ] && [ -f $ESXCFG_VSWITCH ]; then
 
-    switch=$(grep_after $switch_line "com\.vmware\.common\.alias" $NET_DVS | sed -E 's/^	+//')
-    echo "  $switch" >> $OUTPUT
-
-    port_line=$switch_line
-    while true;
+    switch_line=$(grep_after 1 "^switch" $NET_DVS "n")
+    while true; # get VM info
     do
-        port_line=$(grep_after $(($port_line+1)) "port [0-9]*:" $NET_DVS "n")
-        if [ -z "$port_line" ] # if the string was not found
+        next_switch_line=$(grep_after $(($switch_line+1)) "^switch" $NET_DVS "n")
+        if [ -z "$next_switch_line" ] # if the string was not found
         then
+            break_flag=true
+        fi
+    
+        switch=$(grep_after $switch_line "com\.vmware\.common\.alias" $NET_DVS | sed -E 's/^	+//')
+        echo "  $switch" >> $OUTPUT
+    
+        port_line=$switch_line
+        while true;
+        do
+            port_line=$(grep_after $(($port_line+1)) "port [0-9]*:" $NET_DVS "n")
+            if [ -z "$port_line" ] # if the string was not found
+            then
+                break
+            fi
+            if [[ $port_line -gt $next_switch_line ]]
+            then
+                break
+            fi
+            #echo "portline $port_line"
+            port=$(grep_after $port_line "port [0-9]*:" $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
+            alias=$(grep_after $port_line "com\.vmware\.common\.port\.alias" $NET_DVS | sed 's/.*alias = \(.*\) ,.*/\1/')
+            active=$(grep_after $port_line "active =" $NET_DVS | sed 's/.*active =\(.*\)/\1/' | sed -E 's/^ +//')
+            client=$(grep "^  $port " $ESXCFG_VSWITCH | sed -E 's/^ +//' | sed -E 's/ +/,/g' | cut -d ',' -f 3)
+    
+            echo "    port $port:" >> $OUTPUT
+            echo "      alias............$alias" >> $OUTPUT
+            echo "      client...........$client" >> $OUTPUT
+            echo "      teaming.active...$active" >> $OUTPUT
+    
+        done
+        if [ "$break_flag" = true ]
+        then
+            #echo "break"
             break
         fi
-        if [[ $port_line -gt $next_switch_line ]]
-        then
-            break
-        fi
-        #echo "portline $port_line"
-        port=$(grep_after $port_line "port [0-9]*:" $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
-        alias=$(grep_after $port_line "com\.vmware\.common\.port\.alias" $NET_DVS | sed 's/.*alias = \(.*\) ,.*/\1/')
-        active=$(grep_after $port_line "active =" $NET_DVS | sed 's/.*active =\(.*\)/\1/' | sed -E 's/^ +//')
-        client=$(grep "^  $port " $ESXCFG_VSWITCH | sed -E 's/^ +//' | sed -E 's/ +/,/g' | cut -d ',' -f 3)
-
-        echo "    port $port:" >> $OUTPUT
-        echo "      alias............$alias" >> $OUTPUT
-        echo "      client...........$client" >> $OUTPUT
-        echo "      teaming.active...$active" >> $OUTPUT
-
+    
+        switch_line=$next_switch_line
+    
     done
-    if [ "$break_flag" = true ]
-    then
-        #echo "break"
-        break
-    fi
+    printf "\n\n" >> $OUTPUT
 
-    switch_line=$next_switch_line
-
-done
-printf "\n\n" >> $OUTPUT
-
+fi
 
 #echo "- vSwitch, vmk, and vmnic info. From: $NET_STAT" >> $OUTPUT
 #cat $NET_STAT | sed 's/^/  /' >> $OUTPUT
@@ -324,7 +327,9 @@ printf "\n\n" >> $OUTPUT
 
 
 echo "- List of scsi devices. From: $ESXCFG_SCSI" >> $OUTPUT
-cat $ESXCFG_SCSI | sed 's/^/  /' >> $OUTPUT
+if [ -f $ESXCFG_SCSI ]; then
+    cat $ESXCFG_SCSI | sed 's/^/  /' >> $OUTPUT
+fi
 printf "\n\n" >> $OUTPUT
 
 
