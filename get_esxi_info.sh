@@ -235,8 +235,9 @@ if [ -f $NET_DVS ] && [ -f $ESXCFG_VSWITCH ]; then
             break_flag=true
         fi
     
-        switch=$(grep_after $switch_line "com\.vmware\.common\.alias" $NET_DVS | sed -E 's/^	+//')
-        echo "  $switch" >> $OUTPUT
+        #switch=$(grep_after $switch_line "com\.vmware\.common\.alias" $NET_DVS | sed -E 's/^	+//')
+        switch=$(grep_after $switch_line "com\.vmware\.common\.alias" $NET_DVS | sed 's/.*alias = \(.*\) ,.*/\1/')
+        echo "  switch $switch:" >> $OUTPUT
     
         port_line=$switch_line
         while true;
@@ -246,20 +247,22 @@ if [ -f $NET_DVS ] && [ -f $ESXCFG_VSWITCH ]; then
             then
                 break
             fi
-            if [[ $port_line -gt $next_switch_line ]]
+            if [[ ! -z "$next_switch_line" ]] && [[ $port_line -gt $next_switch_line ]]
             then
                 break
             fi
             #echo "portline $port_line"
             port=$(grep_after $port_line "port [0-9]*:" $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
-            alias=$(grep_after $port_line "com\.vmware\.common\.port\.alias" $NET_DVS | sed 's/.*alias = \(.*\) ,.*/\1/')
+            alias=$(grep_after $port_line "com\.vmware\.common\.port\.alias" $NET_DVS | sed 's/.*alias = \([^ ]*\) .*/\1/')
             active=$(grep_after $port_line "active =" $NET_DVS | sed 's/.*active =\(.*\)/\1/' | sed -E 's/^ +//')
-            client=$(grep "^  $port " $ESXCFG_VSWITCH | sed -E 's/^ +//' | sed -E 's/ +/,/g' | cut -d ',' -f 3)
+            dvs_begin=$(grep_after 1 $switch $ESXCFG_VSWITCH "n")
+            dvs_end=$(grep_after $dvs_begin "DVS Name" $ESXCFG_VSWITCH "n")
+            client=$(cat $ESXCFG_VSWITCH | extract_lines $dvs_begin $dvs_end | grep "^  $port " | sed -E 's/^ +//' | sed -E 's/ +/,/g' | cut -d ',' -f 3)
     
             echo "    port $port:" >> $OUTPUT
-            echo "      alias............$alias" >> $OUTPUT
-            echo "      client...........$client" >> $OUTPUT
-            echo "      teaming.active...$active" >> $OUTPUT
+            echo "      alias.............$alias" >> $OUTPUT
+            echo "      client............$client" >> $OUTPUT
+            echo "      teaming.active....$active" >> $OUTPUT
     
         done
         if [ "$break_flag" = true ]
@@ -274,7 +277,6 @@ if [ -f $NET_DVS ] && [ -f $ESXCFG_VSWITCH ]; then
     printf "\n\n" >> $OUTPUT
 
 fi
-
 #echo "- vSwitch, vmk, and vmnic info. From: $NET_STAT" >> $OUTPUT
 #cat $NET_STAT | sed 's/^/  /' >> $OUTPUT
 #printf "\n\n" >> $OUTPUT
