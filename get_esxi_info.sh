@@ -13,6 +13,7 @@ ESXCFG_SCSI=commands/esxcfg-scsidevs_-m.txt
 VMX=vmfs/volumes/*/*/*.vmx
 VMWARE_LOG=vmfs/volumes/*/*/vmware*
 HOSTD=var/run/log/hostd.*
+VMKERNEL=var/run/log/vmkernel.*
 VPXA=var/run/log/vpxa.*
 NET_DVS=commands/net-dvs_-l.txt
 STORAGE_CORE_DEVICE=commands/localcli_storage-core-device-list.txt
@@ -253,7 +254,7 @@ if [ -f $NET_DVS ] && [ -f $ESXCFG_VSWITCH ]; then
             fi
             #echo "portline $port_line"
             port=$(grep_after $port_line "port [0-9]*:" $NET_DVS | sed 's/.*port \([0-9]*\):/\1/')
-            alias=$(grep_after $port_line "com\.vmware\.common\.port\.alias" $NET_DVS | sed 's/.*alias = \([^ ]*\) .*/\1/')
+            alias=$(grep_after $port_line "com\.vmware\.common\.port\.alias" $NET_DVS | cut -d "=" -f 2 | cut -d "," -f 1| sed -E 's/^ +//')
             active=$(grep_after $port_line "active =" $NET_DVS | sed 's/.*active =\(.*\)/\1/' | sed -E 's/^ +//')
             dvs_begin=$(grep_after 1 $switch $ESXCFG_VSWITCH "n")
             dvs_end=$(grep_after $dvs_begin "DVS Name" $ESXCFG_VSWITCH "n")
@@ -429,35 +430,47 @@ printf "\n\n" >> $OUTPUT
 #printf "\n\n" >> $OUTPUT
 
 
-#echo "- Search error message I've ever seen before." >> $OUTPUT
-#messages_hostd=(
-#    "IpmiIfcSdrReadRecordId: retry expired"
-#    "Another process has kept this file locked for more than "
-#    "Invalid transition requested (VM_STATE_ON_SHUTTING_DOWN -> VM_STATE_CREATE_SNAPSHOT)"
-#    "There is not enough space on the file system for the selected operation"
-#    "vim.fault.GenericVmConfigFault"
-#    "was not in passthrough mode"
-#    "Throw vim.fault.FileNotFound"
-#)
-#for i in "${messages_hostd[@]}"
-#do
-#    echo "==> '$i' in $HOSTD" >> $OUTPUT
-#    zgrep "$i" $HOSTD >> $OUTPUT
-#    printf "\n" >> $OUTPUT
-#done
-#
-#messages_vmware_log=(
-#    "'VssSyncStart' operation failed"
-#    "PANIC: VERIFY bora/vmcore/vmx/main/monitorAction.c:598 bugNr=10871"
-#    "is incompatible with this virtual machine configuration"
-#    "is corrupted. If the problem persists, discard the redo log"
-#)
-#for i in "${messages_vmware_log[@]}"
-#do
-#    echo "==> '$i' in $VMWARE_LOG" >> $OUTPUT
-#    zgrep "$i" $VMWARE_LOG >> $OUTPUT
-#    printf "\n" >> $OUTPUT
-#done
+echo "- Search error message I've ever seen before." >> $OUTPUT
+messages_hostd=(
+    "IpmiIfcSdrReadRecordId: retry expired"
+    "Another process has kept this file locked for more than "
+    "Invalid transition requested (VM_STATE_ON_SHUTTING_DOWN -> VM_STATE_CREATE_SNAPSHOT)"
+    "There is not enough space on the file system for the selected operation"
+    "vim.fault.GenericVmConfigFault"
+    "Throw vim.fault.FileNotFound"
+)
+for i in "${messages_hostd[@]}"
+do
+    echo "==> '$i' in $HOSTD" >> $OUTPUT
+    zgrep "$i" $HOSTD >> $OUTPUT
+    printf "\n" >> $OUTPUT
+done
+
+messages_vmkernel=(
+    "No filesystem on the device"
+)
+for i in "${messages_vmkernel[@]}"
+do
+    echo "==> '$i' in $VMKERNEL" >> $OUTPUT
+    zgrep "$i" $VMKERNEL >> $OUTPUT
+    printf "\n" >> $OUTPUT
+done
+
+messages_vmware_log=(
+    "'VssSyncStart' operation failed"
+    "PANIC: VERIFY bora/vmcore/vmx/main/monitorAction.c:598 bugNr=10871"
+    "is incompatible with this virtual machine configuration"
+    "is corrupted. If the problem persists, discard the redo log"
+    "Invalid CPU allocation requested for virtual machine"
+    "Inappropriate ioctl for device "
+    "Configuration mismatch: The virtual machine cannot be restored because the snapshot was taken with VHV enabled."
+)
+for i in "${messages_vmware_log[@]}"
+do
+    echo "==> '$i' in $VMWARE_LOG" >> $OUTPUT
+    zgrep "$i" $VMWARE_LOG >> $OUTPUT
+    printf "\n" >> $OUTPUT
+done
 
 
 echo "$OUTPUT   generated."
