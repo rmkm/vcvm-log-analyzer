@@ -438,6 +438,7 @@ messages_hostd=(
     "There is not enough space on the file system for the selected operation"
     "vim.fault.GenericVmConfigFault"
     "Throw vim.fault.FileNotFound"
+    "Unable to delete DVPort \"\" that is in use, use list"
 )
 for i in "${messages_hostd[@]}"
 do
