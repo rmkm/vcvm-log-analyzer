@@ -17,12 +17,14 @@ VMKERNEL=var/run/log/vmkernel.*
 VPXA=var/run/log/vpxa.*
 NET_DVS=commands/net-dvs_-l.txt
 STORAGE_CORE_DEVICE=commands/localcli_storage-core-device-list.txt
+VM_PROCESS=commands/localcli_vm-process-list.txt
 PARTED_UTIL=commands/partedUtil.sh.txt
 NET_STAT=commands/net-stats_-l.txt
 ESXCFG_MPATH=commands/esxcfg-mpath_-b.txt
 VM_INV=etc/vmware/hostd/vmInventory.xml
 SMBIOS_DUMP=commands/smbiosDump.txt
 ESXCFG_VSWITCH=commands/esxcfg-vswitch_-l.txt
+VM_INVENTORY=etc/vmware/hostd/vmInventory.xml
 LIST_VMX=()
 LIST_VM=()
 
@@ -197,6 +199,10 @@ done
 printf "\n\n" >> $OUTPUT
 
 echo "- List of all vmx files and vm ID. From: $VMX and $VM_INV" >> $OUTPUT
+num_vmx=$(ls $VMX | wc -l)
+num_vmproc=$(grep "Display Name" $VM_PROCESS | wc -l)
+num_registered_vm=$(grep "vmxCfgPath" $VM_INVENTORY | wc -l)
+echo "    num vmx files: $num_vmx, num VM process: $num_vmproc, num registered VM: $num_registered_vm" >> $OUTPUT
 for i in "${LIST_VMX[@]}"
 do
     # not use E option (regex) for grep in order to treat vmx name as a string
