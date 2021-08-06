@@ -135,7 +135,7 @@ echo "- List of the Section line of hostd logs. From: $HOSTD" >> $OUTPUT
 for i in $HOSTD
 do
     #zgrep -Hn -m 1 "Section" $i | sed 's/^/  /' >> $OUTPUT
-    zgrep -Hn "Section" $i | sed 's/^/  /' >> $OUTPUT
+    zgrep -Hn "Section for VMware ESX" $i | sed 's/^/  /' >> $OUTPUT
 done
 printf "\n\n" >> $OUTPUT
 
